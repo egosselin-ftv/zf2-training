@@ -16,10 +16,83 @@
             <arg value="-l"/>
         </exec>
     </target>
+	
+	<!-- Initialisation de la BDD -->
+
+	<target name="init-bdd">
+		<mkdir dir="${project.basedir}/data/db"/>
+		<echo file="${project.basedir}/data/db/create.sql">
+			CREATE DATABASE IF NOT EXISTS ${db.dbname};
+		</echo>
+		
+		<pdosqlexec 
+			url="mysql:host=${db.host}"
+		    userid="${db.username}"
+		    password="${db.password}">
+			
+			<transaction src="${project.basedir}/data/db/create.sql" />
+		</pdosqlexec>
+		
+		<delete dir="${project.basedir}/data/db" quiet="true" />
+	</target>
+	
+	<!-- Migration des entrées -->
+	<target name="migrate-bdd">
+		
+		<property name='doctrine.bin' value="${project.basedir}/vendor/bin/doctrine-module" />
+		
+		<exec command="${doctrine.bin} migrations:migrate --no-interaction" 
+			outputProperty="doctrine.output"/>
+			
+			<echo msg="${doctrine.output}" />
+		    <if>
+		    	<contains string="${doctrine.output}" substring="could not find any migrations" />
+				<else>
+					<exec command="${doctrine.bin} orm:clear-cache:metadata" passthru="true" />
+					<exec command="${doctrine.bin} orm:clear-cache:query" passthru="true" />
+				</else>
+			</if>	
+	</target>
+	
+	<!-- Génération de la config -->
+	<target name="generate-config">
+		<!--
+		<propertyprompt propertyName="db.host" defaultValue="localhost"
+			promptText="host de la bdd" />
+		<propertyprompt propertyName="db.port" defaultValue="3306"
+			promptText="port de la bdd" />
+		<propertyprompt propertyName="db.dbname" defaultValue=""
+			promptText="nom de la bdd" />
+		<propertyprompt propertyName="db.username" defaultValue="root"
+			promptText="user de la bdd" />
+		<propertyprompt propertyName="db.password" defaultValue="root"
+			promptText="pass de la bdd" />
+		-->
+		
+		<copy todir="${project.basedir}/config/autoload/">
+			<fileset dir="${project.basedir}/config/autoload/">
+			    <include name="**/*.local.php.dist" />
+			</fileset>
+			<!-- <mapper type="regexp" from="^([a-z]+)\.local\.php\.dist" to="\1.local.php"/> -->
+			<mapper type="glob" from="*.local.php.dist" to="*.local.php"/>
+			
+			<filterchain>
+				<replacetokens>
+			 		<token key="db.host" value="${db.host}" />
+					<token key="db.port" value="${db.port}" />
+			 		<token key="db.dbname" value="${db.dbname}" />
+					<token key="db.username" value="${db.username}" />
+					<token key="db.password" value="${db.password}" />
+				</replacetokens>
+			</filterchain>
+		</copy>
+	</target>
     
     <target name="provision-stack"
             description="Provision a stack on AWS" />
     
     <target name="setup"
-            description="Setup external dependencies and migrate data"/>
+    	description="Setup external dependencies and migrate data" 
+    	depends="generate-config, init-bdd, migrate-bdd" 
+    />
 </project>
