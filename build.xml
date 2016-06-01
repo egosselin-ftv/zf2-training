@@ -64,6 +64,8 @@
         <exec command="${doctrine.bin} orm:clear-cache:query" passthru="true"/>
     </target>
 
+	<!-- test -->
+	
     <!-- generate config -->
     <target name="generate-config">
 
